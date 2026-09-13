@@ -59,11 +59,11 @@ Given this upstream document:
 
 ```json
 {
-  "issuer": "https://issuer.central-dev.aldershaab-it.dk/runtime-identity/",
+  "issuer": "https://jwks-proxy.com/runtime-identity/",
   "authorization_endpoint": "https://idp.example.com/application/o/authorize/",
   "token_endpoint": "https://idp.example.com/application/o/token/",
-  "end_session_endpoint": "https://issuer.central-dev.aldershaab-it.dk/runtime-identity/end-session/",
-  "jwks_uri": "https://issuer.central-dev.aldershaab-it.dk/runtime-identity/jwks/"
+  "end_session_endpoint": "https://jwks-proxy.com/runtime-identity/end-session/",
+  "jwks_uri": "https://jwks-proxy.com/runtime-identity/jwks/"
 }
 ```
 
@@ -74,7 +74,7 @@ with `external_url: https://jwks-proxy.com`, the served copy becomes:
   "issuer": "https://jwks-proxy.com/runtime-identity",
   "authorization_endpoint": "https://idp.example.com/application/o/authorize/",
   "token_endpoint": "https://idp.example.com/application/o/token/",
-  "end_session_endpoint": "https://issuer.central-dev.aldershaab-it.dk/runtime-identity/end-session/",
+  "end_session_endpoint": "https://jwks-proxy.com/runtime-identity/end-session/",
   "jwks_uri": "https://jwks-proxy.com/runtime-identity/jwks"
 }
 ```
