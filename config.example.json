@@ -1,0 +1,10 @@
+{
+  "listen": ":8080",
+  "external_url": "https://jwks-proxy.com",
+  "cache_ttl_seconds": 300,
+  "routes": {
+    "foobar": {
+      "upstream": "https://authentik.central-dev.aldershaab-it.dk/application/o/foobar"
+    }
+  }
+}

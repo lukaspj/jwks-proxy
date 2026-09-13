@@ -1,0 +1,73 @@
+replicaCount: 2
+
+image:
+  repository: ghcr.io/lukaspj/jwks-proxy
+  tag: latest
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+# Rendered into a config.json mounted into the container.
+# Pass routes here, or use existingConfigMap for full control.
+config:
+  listen: ":8080"
+  externalUrl: ""       # required – e.g. https://jwks-proxy.com
+  cacheTtlSeconds: 300
+  routes:
+    # foobar:
+    #   upstream: https://authentik.example.com/application/o/foobar
+    #   replacements:
+    #     - find: https://keys.internal.example.com/jwks.json
+    #       replace: https://jwks-proxy.com/foobar/jwks
+
+# Use an existing ConfigMap holding a config.json (mounted as config.json
+# in /config) instead of rendering one from `config` above.
+existingConfigMap: ""
+
+service:
+  type: ClusterIP
+  port: 80
+
+probes:
+  liveness:
+    initialDelaySeconds: 2
+    periodSeconds: 10
+  readiness:
+    initialDelaySeconds: 2
+    periodSeconds: 5
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    memory: 128Mi
+
+automountServiceAccountToken: false
+
+podSecurityContext:
+  runAsNonRoot: true
+  # Matches the nonroot user in the distroless image (uid/gid 65532).
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  privileged: false
+  capabilities:
+    drop: [ALL]
+
+podAnnotations: {}
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

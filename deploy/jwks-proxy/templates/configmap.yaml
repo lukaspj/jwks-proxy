@@ -1,0 +1,16 @@
+{{- if and (not .Values.existingConfigMap) .Values.config.externalUrl }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "jwks-proxy.fullname" . }}
+  labels:
+    {{- include "jwks-proxy.labels" . | nindent 4 }}
+data:
+  config.json: |
+    {{- $cfg := dict
+          "listen" .Values.config.listen
+          "external_url" .Values.config.externalUrl
+          "cache_ttl_seconds" .Values.config.cacheTtlSeconds
+          "routes" .Values.config.routes }}
+    {{ toJson $cfg | nindent 4 }}
+{{- end }}

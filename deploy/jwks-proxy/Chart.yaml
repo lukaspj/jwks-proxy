@@ -1,0 +1,6 @@
+apiVersion: v2
+name: jwks-proxy
+description: A Go service that proxies OIDC discovery documents and JWKS endpoints, rewriting URLs with string find-and-replace.
+type: application
+version: 0.1.0
+appVersion: "latest"
