@@ -12,20 +12,16 @@ serviceAccount:
   name: ""
   annotations: {}
 
-# Rendered into a config.json mounted into the container.
-# Pass routes here, or use existingConfigMap for full control.
+# Rendered into a config.yaml mounted into the container.
+# Set externalUrl and upstreamTemplate here, or use existingConfigMap
+# for full control.
 config:
   listen: ":8080"
   externalUrl: ""       # required – e.g. https://jwks-proxy.com
+  upstreamTemplate: ""  # required – e.g. https://authentik.example.com/application/o/{route}
   cacheTtlSeconds: 300
-  routes:
-    # foobar:
-    #   upstream: https://authentik.example.com/application/o/foobar
-    #   replacements:
-    #     - find: https://keys.internal.example.com/jwks.json
-    #       replace: https://jwks-proxy.com/foobar/jwks
 
-# Use an existing ConfigMap holding a config.json (mounted as config.json
+# Use an existing ConfigMap holding a config.yaml (mounted as config.yaml
 # in /config) instead of rendering one from `config` above.
 existingConfigMap: ""
 

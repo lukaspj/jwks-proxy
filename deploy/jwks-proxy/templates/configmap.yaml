@@ -1,4 +1,4 @@
-{{- if and (not .Values.existingConfigMap) .Values.config.externalUrl }}
+{{- if and (not .Values.existingConfigMap) .Values.config.externalUrl .Values.config.upstreamTemplate }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -6,11 +6,9 @@ metadata:
   labels:
     {{- include "jwks-proxy.labels" . | nindent 4 }}
 data:
-  config.json: |
-    {{- $cfg := dict
-          "listen" .Values.config.listen
-          "external_url" .Values.config.externalUrl
-          "cache_ttl_seconds" .Values.config.cacheTtlSeconds
-          "routes" .Values.config.routes }}
-    {{ toJson $cfg | nindent 4 }}
+  config.yaml: |
+    listen: {{ .Values.config.listen | quote }}
+    external_url: {{ required "config.externalUrl is required" .Values.config.externalUrl | quote }}
+    upstream_template: {{ required "config.upstreamTemplate is required" .Values.config.upstreamTemplate | quote }}
+    cache_ttl_seconds: {{ .Values.config.cacheTtlSeconds }}
 {{- end }}

@@ -44,25 +44,22 @@ func callProxy(p *Proxy, path string) *httptest.ResponseRecorder {
 	return rec
 }
 
-func testConfig(external, authHost string) *Config {
+func testConfig(external, template string) *Config {
 	return &Config{
-		Listen:       ":0",
-		ExternalURL:  external,
-		CacheTTLSecs: 1,
-		Routes: map[string]Route{
-			"foobar": {
-				Upstream: authHost + "/application/o/foobar",
-			},
-		},
+		Listen:           ":0",
+		ExternalURL:      external,
+		UpstreamTemplate: template,
+		CacheTTLSecs:     1,
 	}
 }
 
+const testTemplate = "http://auth.example.com/application/o/{route}"
+
 func TestDiscoveryRewritesIssuerAndJwksURI(t *testing.T) {
-	upstream := "http://auth.example.com"
 	client := fakeUpstream(func(r *http.Request) (*http.Response, error) {
 		switch r.URL.Path {
 		case "/application/o/foobar/.well-known/openid-configuration":
-			return fakeResponse(fmt.Sprintf(`{"issuer": "%s/application/o/foobar", "jwks_uri": "%s/application/o/foobar/jwks/", "token_endpoint": "%s/application/o/foobar/token/"}`, upstream, upstream, upstream)), nil
+			return fakeResponse(fmt.Sprintf(`{"issuer": "http://auth.example.com/application/o/foobar", "jwks_uri": "http://auth.example.com/application/o/foobar/jwks/", "token_endpoint": "http://auth.example.com/application/o/foobar/token/"}`)), nil
 		case "/application/o/foobar/jwks/":
 			return fakeResponse(`{"keys": [{"kty": "RSA", "kid": "test-key"}]}`), nil
 		default:
@@ -70,7 +67,7 @@ func TestDiscoveryRewritesIssuerAndJwksURI(t *testing.T) {
 		}
 	})
 
-	p := NewProxyWithClient(testConfig("https://jwks-proxy.com", upstream), client)
+	p := NewProxyWithClient(testConfig("https://jwks-proxy.com", testTemplate), client)
 	rec := callProxy(p, "/foobar/.well-known/openid-configuration")
 	if rec.Code != 200 {
 		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
@@ -91,11 +88,10 @@ func TestDiscoveryRewritesIssuerAndJwksURI(t *testing.T) {
 }
 
 func TestJWKSProxied(t *testing.T) {
-	upstream := "http://auth.example.com"
 	client := fakeUpstream(func(r *http.Request) (*http.Response, error) {
 		switch r.URL.Path {
 		case "/application/o/foobar/.well-known/openid-configuration":
-			return fakeResponse(fmt.Sprintf(`{"issuer": "%s/application/o/foobar", "jwks_uri": "%s/application/o/foobar/jwks/"}`, upstream, upstream)), nil
+			return fakeResponse(fmt.Sprintf(`{"issuer": "http://auth.example.com/application/o/foobar", "jwks_uri": "http://auth.example.com/application/o/foobar/jwks/"}`)), nil
 		case "/application/o/foobar/jwks/":
 			return fakeResponse(`{"keys": [{"kty": "RSA", "kid": "test-key"}]}`), nil
 		default:
@@ -103,7 +99,7 @@ func TestJWKSProxied(t *testing.T) {
 		}
 	})
 
-	p := NewProxyWithClient(testConfig("https://jwks-proxy.com", upstream), client)
+	p := NewProxyWithClient(testConfig("https://jwks-proxy.com", testTemplate), client)
 	rec := callProxy(p, "/foobar/jwks")
 	if rec.Code != 200 {
 		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
@@ -113,40 +109,52 @@ func TestJWKSProxied(t *testing.T) {
 	}
 }
 
-func TestUnknownRoute404(t *testing.T) {
-	p := NewProxy(testConfig("https://jwks-proxy.com", "http://127.0.0.1:8123"))
-	rec := callProxy(p, "/nosuch/.well-known/openid-configuration")
-	if rec.Code != 404 {
-		t.Fatalf("status = %d, want 404", rec.Code)
+func TestDynamicRouteNoConfig(t *testing.T) {
+	client := fakeUpstream(func(r *http.Request) (*http.Response, error) {
+		switch r.URL.Path {
+		case "/application/o/bazapp/.well-known/openid-configuration":
+			return fakeResponse(fmt.Sprintf(`{"issuer": "http://auth.example.com/application/o/bazapp", "jwks_uri": "http://auth.example.com/application/o/bazapp/jwks"}`)), nil
+		case "/application/o/bazapp/jwks":
+			return fakeResponse(`{"keys": [{"kty": "EC", "kid": "baz"}]}`), nil
+		default:
+			return notFoundResponse(), nil
+		}
+	})
+
+	p := NewProxyWithClient(testConfig("https://jwks-proxy.com", testTemplate), client)
+	rec := callProxy(p, "/bazapp/jwks")
+	if rec.Code != 200 {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "baz") {
+		t.Errorf("jwks body missing key: %q", rec.Body.String())
 	}
 }
 
-func TestCustomReplacements(t *testing.T) {
-	upstream := "http://auth.example.com"
+func TestUpstream404Propagates(t *testing.T) {
 	client := fakeUpstream(func(r *http.Request) (*http.Response, error) {
-		if r.URL.Path == "/oidc/.well-known/openid-configuration" {
-			return fakeResponse(`{"jwks_uri": "https://keys.internal.example.com/jwks.json", "issuer": "https://auth.example.com/oidc"}`), nil
+		return notFoundResponse(), nil
+	})
+
+	p := NewProxyWithClient(testConfig("https://jwks-proxy.com", testTemplate), client)
+	rec := callProxy(p, "/nosuchapp/.well-known/openid-configuration")
+	if rec.Code != 502 {
+		t.Fatalf("status = %d, want 502", rec.Code)
+	}
+}
+
+func TestNoInternalLeak(t *testing.T) {
+	client := fakeUpstream(func(r *http.Request) (*http.Response, error) {
+		if r.URL.Path == "/application/o/foobar/.well-known/openid-configuration" {
+			return fakeResponse(fmt.Sprintf(`{"issuer": "http://auth.example.com/application/o/foobar", "jwks_uri": "http://auth.example.com/application/o/foobar/jwks", "authorization_endpoint": "http://auth.example.com/application/o/foobar/auth"}`)), nil
 		}
 		return notFoundResponse(), nil
 	})
 
-	cfg := testConfig("https://jwks-proxy.com", upstream)
-	route := cfg.Routes["foobar"]
-	route.Upstream = upstream + "/oidc"
-	route.Replacements = []ReplaceRule{
-		{Find: "https://keys.internal.example.com/jwks.json", Replace: "https://jwks-proxy.com/foobar/jwks"},
-	}
-	cfg.Routes["foobar"] = route
-
-	rec := callProxy(NewProxyWithClient(cfg, client), "/foobar/.well-known/openid-configuration")
-	if rec.Code != 200 {
-		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
-	}
+	p := NewProxyWithClient(testConfig("https://jwks-proxy.com", testTemplate), client)
+	rec := callProxy(p, "/foobar/.well-known/openid-configuration")
 	s := rec.Body.String()
-	if strings.Contains(s, "keys.internal.example.com") {
+	if strings.Contains(s, "auth.example.com") {
 		t.Errorf("internal host leaked: %s", s)
-	}
-	if !strings.Contains(s, "https://jwks-proxy.com/foobar/jwks") {
-		t.Errorf("replacement missing: %s", s)
 	}
 }

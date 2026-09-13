@@ -32,7 +32,7 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
             - -config
-            - /config/config.json
+            - /config/config.yaml
           ports:
             - name: http
               containerPort: {{ trimPrefix ":" .Values.config.listen | default 8080 }}

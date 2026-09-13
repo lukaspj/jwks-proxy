@@ -9,10 +9,10 @@ import (
 )
 
 func main() {
-	configPath := flag.String("config", os.Getenv("JWKS_PROXY_CONFIG"), "path to config file")
+	configPath := flag.String("config", os.Getenv("JWKS_PROXY_CONFIG"), "path to config file (yaml)")
 	flag.Parse()
 	if *configPath == "" {
-		*configPath = "config.json"
+		*configPath = "config.yaml"
 	}
 
 	cfg, err := LoadConfig(*configPath)
@@ -21,7 +21,7 @@ func main() {
 	}
 
 	addr := cfg.Listen
-	fmt.Printf("jwks-proxy listening on %s (external: %s, routes: %d)\n", addr, cfg.ExternalURL, len(cfg.Routes))
+	fmt.Printf("jwks-proxy listening on %s (external: %s, upstream: %s)\n", addr, cfg.ExternalURL, cfg.UpstreamTemplate)
 	if err := http.ListenAndServe(addr, NewProxy(cfg).Handler()); err != nil {
 		log.Fatal(err)
 	}
