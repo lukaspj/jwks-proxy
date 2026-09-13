@@ -79,11 +79,11 @@ func TestDiscoveryRewritesIssuerAndJwksURI(t *testing.T) {
 	if got, want := doc["issuer"], "https://jwks-proxy.com/foobar"; got != want {
 		t.Errorf("issuer = %q, want %q", got, want)
 	}
-	if got, want := doc["jwks_uri"], "https://jwks-proxy.com/foobar/jwks/"; got != want {
+	if got, want := doc["jwks_uri"], "https://jwks-proxy.com/foobar/jwks"; got != want {
 		t.Errorf("jwks_uri = %q, want %q", got, want)
 	}
-	if got, want := doc["token_endpoint"], "https://jwks-proxy.com/foobar/token/"; got != want {
-		t.Errorf("token_endpoint = %q, want %q", got, want)
+	if got, want := doc["token_endpoint"], "http://auth.example.com/application/o/foobar/token/"; got != want {
+		t.Errorf("token_endpoint = %q, want %q (should be untouched)", got, want)
 	}
 }
 
@@ -143,18 +143,33 @@ func TestUpstream404Propagates(t *testing.T) {
 	}
 }
 
-func TestNoInternalLeak(t *testing.T) {
+func TestFieldAwareRewrite(t *testing.T) {
 	client := fakeUpstream(func(r *http.Request) (*http.Response, error) {
 		if r.URL.Path == "/application/o/foobar/.well-known/openid-configuration" {
-			return fakeResponse(fmt.Sprintf(`{"issuer": "http://auth.example.com/application/o/foobar", "jwks_uri": "http://auth.example.com/application/o/foobar/jwks", "authorization_endpoint": "http://auth.example.com/application/o/foobar/auth"}`)), nil
+			return fakeResponse(fmt.Sprintf(`{"issuer": "http://auth.example.com/application/o/foobar", "jwks_uri": "http://auth.example.com/application/o/foobar/jwks", "authorization_endpoint": "http://auth.example.com/application/o/foobar/auth", "end_session_endpoint": "http://auth.example.com/application/o/foobar/end-session"}`)), nil
 		}
 		return notFoundResponse(), nil
 	})
 
 	p := NewProxyWithClient(testConfig("https://jwks-proxy.com", testTemplate), client)
 	rec := callProxy(p, "/foobar/.well-known/openid-configuration")
-	s := rec.Body.String()
-	if strings.Contains(s, "auth.example.com") {
-		t.Errorf("internal host leaked: %s", s)
+	if rec.Code != 200 {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	var doc map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &doc); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := doc["issuer"], "https://jwks-proxy.com/foobar"; got != want {
+		t.Errorf("issuer = %q, want %q", got, want)
+	}
+	if got, want := doc["jwks_uri"], "https://jwks-proxy.com/foobar/jwks"; got != want {
+		t.Errorf("jwks_uri = %q, want %q", got, want)
+	}
+	if got, want := doc["authorization_endpoint"], "http://auth.example.com/application/o/foobar/auth"; got != want {
+		t.Errorf("authorization_endpoint = %q, want %q (should be untouched)", got, want)
+	}
+	if got, want := doc["end_session_endpoint"], "http://auth.example.com/application/o/foobar/end-session"; got != want {
+		t.Errorf("end_session_endpoint = %q, want %q (should be untouched)", got, want)
 	}
 }

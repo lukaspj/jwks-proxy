@@ -56,8 +56,30 @@ func (p *Proxy) Handler() http.Handler {
 	return mux
 }
 
-func (p *Proxy) rewrite(name string, body []byte) []byte {
-	return []byte(strings.ReplaceAll(string(body), p.cfg.UpstreamBase(name), p.cfg.ExternalURL+"/"+name))
+func (p *Proxy) rewrite(name string, raw []byte) ([]byte, string, error) {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return nil, "", fmt.Errorf("parse discovery doc: %w", err)
+	}
+
+	var upstreamJwksURI string
+	if fields["jwks_uri"] != nil {
+		if err := json.Unmarshal(fields["jwks_uri"], &upstreamJwksURI); err != nil {
+			return nil, "", fmt.Errorf("parse jwks_uri: %w", err)
+		}
+	}
+
+	external := p.cfg.ExternalURL + "/" + name
+	issuer, _ := json.Marshal(external)
+	jwksURI, _ := json.Marshal(external + "/jwks")
+	fields["issuer"] = issuer
+	fields["jwks_uri"] = jwksURI
+
+	body, err := json.Marshal(fields)
+	if err != nil {
+		return nil, "", fmt.Errorf("serialize discovery doc: %w", err)
+	}
+	return body, upstreamJwksURI, nil
 }
 
 func (p *Proxy) fetchUpstream(url string) ([]byte, int, error) {
@@ -90,16 +112,14 @@ func (p *Proxy) getDiscoveryDoc(name string) (cachedDoc, int, error) {
 		return cachedDoc{}, status, err
 	}
 
-	var discovery struct {
-		JWKSURI string `json:"jwks_uri"`
-	}
-	if err := json.Unmarshal(raw, &discovery); err != nil {
-		return cachedDoc{}, http.StatusBadGateway, fmt.Errorf("parse discovery doc from %s: %w", docURL, err)
+	body, upstreamJwksURI, err := p.rewrite(name, raw)
+	if err != nil {
+		return cachedDoc{}, http.StatusBadGateway, err
 	}
 
 	doc := cachedDoc{
-		upstreamJwksURI: discovery.JWKSURI,
-		body:            p.rewrite(name, raw),
+		upstreamJwksURI: upstreamJwksURI,
+		body:            body,
 		expires:         time.Now().Add(p.cfg.CacheTTL()),
 	}
 
