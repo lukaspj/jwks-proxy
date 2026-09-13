@@ -11,7 +11,7 @@ GET /<route>/jwks                # and /<route>/jwks/
 
 ## Example
 
-With `upstream_template: https://authentik.central-dev.aldershaab-it.dk/application/o/{route}`, requests to
+With `upstream_template: https://idp.example.com/application/o/{route}`, requests to
 
 ```
 https://jwks-proxy.com/foobar/.well-known/openid-configuration
@@ -20,10 +20,10 @@ https://jwks-proxy.com/foobar/.well-known/openid-configuration
 return a copy of
 
 ```
-https://authentik.central-dev.aldershaab-it.dk/application/o/foobar/.well-known/openid-configuration
+https://idp.example.com/application/o/foobar/.well-known/openid-configuration
 ```
 
-with every occurrence of the upstream base URL (`https://authentik.central-dev.aldershaab-it.dk/application/o/foobar`) replaced by `https://jwks-proxy.com/foobar`. The issuer, token endpoints and `jwks_uri` all end up pointing at the proxy, and `jwks_uri` resolves to
+with every occurrence of the upstream base URL (`https://idp.example.com/application/o/foobar`) replaced by `https://jwks-proxy.com/foobar`. The issuer, token endpoints and `jwks_uri` all end up pointing at the proxy, and `jwks_uri` resolves to
 
 ```
 https://jwks-proxy.com/foobar/jwks/
@@ -38,7 +38,7 @@ Loaded with [go-fang](https://github.com/lukaspj/go-fang) (YAML file + env overr
 ```yaml
 listen: ":8080"
 external_url: https://jwks-proxy.com
-upstream_template: https://authentik.central-dev.aldershaab-it.dk/application/o/{route}
+upstream_template: https://idp.example.com/application/o/{route}
 cache_ttl_seconds: 300
 ```
 
@@ -60,8 +60,8 @@ Given this upstream document:
 ```json
 {
   "issuer": "https://issuer.central-dev.aldershaab-it.dk/runtime-identity/",
-  "authorization_endpoint": "https://authentik.central-dev.aldershaab-it.dk/application/o/authorize/",
-  "token_endpoint": "https://authentik.central-dev.aldershaab-it.dk/application/o/token/",
+  "authorization_endpoint": "https://idp.example.com/application/o/authorize/",
+  "token_endpoint": "https://idp.example.com/application/o/token/",
   "end_session_endpoint": "https://issuer.central-dev.aldershaab-it.dk/runtime-identity/end-session/",
   "jwks_uri": "https://issuer.central-dev.aldershaab-it.dk/runtime-identity/jwks/"
 }
@@ -72,8 +72,8 @@ with `external_url: https://jwks-proxy.com`, the served copy becomes:
 ```json
 {
   "issuer": "https://jwks-proxy.com/runtime-identity",
-  "authorization_endpoint": "https://authentik.central-dev.aldershaab-it.dk/application/o/authorize/",
-  "token_endpoint": "https://authentik.central-dev.aldershaab-it.dk/application/o/token/",
+  "authorization_endpoint": "https://idp.example.com/application/o/authorize/",
+  "token_endpoint": "https://idp.example.com/application/o/token/",
   "end_session_endpoint": "https://issuer.central-dev.aldershaab-it.dk/runtime-identity/end-session/",
   "jwks_uri": "https://jwks-proxy.com/runtime-identity/jwks"
 }

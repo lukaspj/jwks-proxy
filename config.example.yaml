@@ -2,5 +2,5 @@ listen: ":8080"
 external_url: https://jwks-proxy.com
 # {route} is replaced with the first path segment of the incoming request,
 # e.g. /foobar/.well-known/openid-configuration -> foobar
-upstream_template: https://authentik.central-dev.aldershaab-it.dk/application/o/{route}
+upstream_template: https://idp.example.com/application/o/{route}
 cache_ttl_seconds: 300
