@@ -23,13 +23,13 @@ return a copy of
 https://idp.example.com/application/o/foobar/.well-known/openid-configuration
 ```
 
-with every occurrence of the upstream base URL (`https://idp.example.com/application/o/foobar`) replaced by `https://jwks-proxy.com/foobar`. The issuer, token endpoints and `jwks_uri` all end up pointing at the proxy, and `jwks_uri` resolves to
+with two fields rewritten: `issuer` becomes `https://jwks-proxy.com/foobar` and `jwks_uri` becomes
 
 ```
-https://jwks-proxy.com/foobar/jwks/
+https://jwks-proxy.com/foobar/jwks
 ```
 
-which is proxied from the upstream JWKS endpoint.
+which is proxied from the upstream JWKS endpoint. All other fields (`token_endpoint`, `authorization_endpoint`, …) pass through untouched.
 
 ## Configuration (YAML)
 
@@ -59,11 +59,11 @@ Given this upstream document:
 
 ```json
 {
-  "issuer": "https://jwks-proxy.com/runtime-identity/",
+  "issuer": "https://idp.example.com/application/o/runtime-identity/",
   "authorization_endpoint": "https://idp.example.com/application/o/authorize/",
   "token_endpoint": "https://idp.example.com/application/o/token/",
-  "end_session_endpoint": "https://jwks-proxy.com/runtime-identity/end-session/",
-  "jwks_uri": "https://jwks-proxy.com/runtime-identity/jwks/"
+  "end_session_endpoint": "https://idp.example.com/application/o/runtime-identity/end-session/",
+  "jwks_uri": "https://idp.example.com/application/o/runtime-identity/jwks/"
 }
 ```
 
@@ -74,7 +74,7 @@ with `external_url: https://jwks-proxy.com`, the served copy becomes:
   "issuer": "https://jwks-proxy.com/runtime-identity",
   "authorization_endpoint": "https://idp.example.com/application/o/authorize/",
   "token_endpoint": "https://idp.example.com/application/o/token/",
-  "end_session_endpoint": "https://jwks-proxy.com/runtime-identity/end-session/",
+  "end_session_endpoint": "https://idp.example.com/application/o/runtime-identity/end-session/",
   "jwks_uri": "https://jwks-proxy.com/runtime-identity/jwks"
 }
 ```
@@ -82,8 +82,8 @@ with `external_url: https://jwks-proxy.com`, the served copy becomes:
 Why this split:
 
 - **`issuer`** is rewritten because OIDC clients validate that the document was served from the issuer URL; the issuer must therefore match the proxy's external URL for the proxy to be transparent.
-- **`jwks_uri`** is rewritten (and its target proxied) so clients fetch signing keys from the proxy instead of the internal issuer host — this is the core purpose of the service. The proxy extracts the upstream `jwks_uri` before rewriting and serves it at `/<route>/jwks`.
-- **`end_session_endpoint`** is *not* rewritten: it is assumed to be directly reachable by clients. If your clients can only reach the proxy host (and not the issuer host directly), RP-initiated logout will break — in that case the issuer host should be made reachable, or you should front it separately.
+- **`jwks_uri`** is rewritten (and its target proxied) so clients fetch signing keys from the proxy instead of the upstream host — this is the core purpose of the service. The proxy extracts the upstream `jwks_uri` before rewriting and serves it at `/<route>/jwks`.
+- **`end_session_endpoint`** is *not* rewritten: it is assumed to be directly reachable by clients. If your clients can only reach the proxy host (and not the upstream host directly), RP-initiated logout will break — in that case the upstream host should be made reachable, or you should front it separately.
 - **`authorization_endpoint`, `token_endpoint`, etc.** are likewise untouched: they are assumed to be directly reachable by clients. The proxy is not a general reverse proxy for them.
 
 ## Behavior
@@ -126,7 +126,7 @@ A Helm chart lives in [`deploy/jwks-proxy`](deploy/jwks-proxy):
 ```
 helm install jwks-proxy ./deploy/jwks-proxy \
   --set config.externalUrl=https://jwks-proxy.com \
-  --set config.upstreamTemplate=https://authentik.example.com/application/o/{route}
+  --set config.upstreamTemplate=https://idp.example.com/application/o/{route}
 ```
 
 The chart renders `config.yaml` into a ConfigMap and mounts it; alternatively pass `existingConfigMap` pointing at a ConfigMap that already contains a `config.yaml` key.

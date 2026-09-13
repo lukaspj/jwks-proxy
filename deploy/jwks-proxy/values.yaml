@@ -18,7 +18,7 @@ serviceAccount:
 config:
   listen: ":8080"
   externalUrl: ""       # required – e.g. https://jwks-proxy.com
-  upstreamTemplate: ""  # required – e.g. https://authentik.example.com/application/o/{route}
+  upstreamTemplate: ""  # required – e.g. https://idp.example.com/application/o/{route}
   cacheTtlSeconds: 300
 
 # Use an existing ConfigMap holding a config.yaml (mounted as config.yaml
